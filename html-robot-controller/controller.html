@@ -1,0 +1,477 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>🏎️ Racing Car Controller</title>
+    
+    <!-- MQTT.js Library -->
+    <script src="https://unpkg.com/mqtt@5.3.0/dist/mqtt.min.js"></script>
+    
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            -webkit-tap-highlight-color: transparent;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 20px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            color: white;
+        }
+        
+        h1 {
+            margin-bottom: 10px;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+            font-size: 2em;
+        }
+        
+        .connection-status {
+            padding: 10px 20px;
+            border-radius: 10px;
+            margin-bottom: 10px;
+            font-weight: bold;
+            backdrop-filter: blur(10px);
+        }
+        
+        .connected {
+            background: rgba(76, 175, 80, 0.3);
+            color: #4CAF50;
+        }
+        
+        .disconnected {
+            background: rgba(244, 67, 54, 0.3);
+            color: #f44336;
+        }
+        
+        .info {
+            background: rgba(255,255,255,0.2);
+            padding: 10px 20px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+            backdrop-filter: blur(10px);
+            text-align: center;
+        }
+        
+        /* LED SEIN CONTROLS */
+        .sein-controls {
+            display: flex;
+            gap: 15px;
+            margin-bottom: 20px;
+            background: rgba(0,0,0,0.2);
+            padding: 15px;
+            border-radius: 15px;
+            backdrop-filter: blur(10px);
+        }
+        
+        .sein-btn {
+            padding: 12px 25px;
+            border: 2px solid rgba(255,255,255,0.3);
+            border-radius: 10px;
+            background: rgba(255, 193, 7, 0.3);
+            color: white;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.2s;
+            font-size: 14px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        
+        .sein-btn:hover {
+            transform: translateY(-2px);
+            border-color: rgba(255,255,255,0.6);
+        }
+        
+        .sein-btn.active {
+            background: linear-gradient(135deg, #FFC107 0%, #FF9800 100%);
+            border-color: #FFC107;
+            box-shadow: 0 0 20px rgba(255, 193, 7, 0.5);
+        }
+        
+        .controller {
+            display: grid;
+            grid-template-columns: repeat(3, 110px);
+            gap: 15px;
+            margin: 20px;
+            padding: 20px;
+            background: rgba(0,0,0,0.2);
+            border-radius: 20px;
+            backdrop-filter: blur(10px);
+            box-shadow: 0 8px 32px rgba(0,0,0,0.3);
+        }
+        
+        button {
+            width: 110px;
+            height: 110px;
+            border: 3px solid rgba(255,255,255,0.3);
+            border-radius: 20px;
+            font-size: 16px;
+            font-weight: bold;
+            color: white;
+            cursor: pointer;
+            transition: all 0.1s;
+            background: rgba(255,255,255,0.1);
+            backdrop-filter: blur(5px);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 5px;
+            user-select: none;
+            text-shadow: 1px 1px 2px rgba(0,0,0,0.5);
+        }
+        
+        button .icon {
+            font-size: 36px;
+        }
+        
+        button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 15px rgba(0,0,0,0.3);
+        }
+        
+        button:active {
+            transform: scale(0.95);
+            border-color: rgba(255,255,255,0.8);
+        }
+        
+        .maju { 
+            background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%);
+        }
+        
+        .mundur { 
+            background: linear-gradient(135deg, #ee0979 0%, #ff6a00 100%);
+        }
+        
+        .kiri, .kanan { 
+            background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+        }
+        
+        .berhenti { 
+            background: linear-gradient(135deg, #4b4b4b 0%, #7d7d7d 100%);
+        }
+        
+        .pressed {
+            transform: scale(0.9) !important;
+            box-shadow: inset 0 0 20px rgba(0,0,0,0.5);
+        }
+        
+        .mode-indicator {
+            margin-top: 15px;
+            padding: 10px 20px;
+            border-radius: 10px;
+            background: rgba(255,255,255,0.2);
+            backdrop-filter: blur(10px);
+            font-size: 18px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+        }
+        
+        #status {
+            margin-top: 20px;
+            padding: 15px 30px;
+            border-radius: 15px;
+            background: rgba(255,255,255,0.9);
+            color: #333;
+            font-weight: bold;
+            min-width: 300px;
+            text-align: center;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+        }
+        
+        @media (max-width: 600px) {
+            h1 {
+                font-size: 1.5em;
+            }
+            
+            .sein-controls {
+                flex-direction: column;
+                gap: 8px;
+            }
+            
+            .sein-btn {
+                width: 100%;
+            }
+            
+            .controller {
+                grid-template-columns: repeat(3, 90px);
+                gap: 10px;
+                padding: 15px;
+            }
+            
+            button {
+                width: 90px;
+                height: 90px;
+                font-size: 14px;
+            }
+            
+            button .icon {
+                font-size: 30px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <h1>🏎️ Racing Car Controller</h1>
+    
+    <div class="connection-status" id="connectionStatus">
+        🔴 Disconnected
+    </div>
+    
+    <div class="info">
+        <strong>MQTT Broker:</strong> 158.140.183.210:9001 (WebSocket)<br>
+        <strong>Topic:</strong> motor_robot
+    </div>
+    
+    <!-- LED SEIN CONTROLS -->
+    <div class="sein-controls">
+        <button class="sein-btn" id="btnSeinKiri" onclick="toggleSein('kiri')">
+            <span>◀</span>
+            <span>SEIN KIRI</span>
+        </button>
+        <button class="sein-btn" onclick="seinOffAll()">
+            <span>⏹</span>
+            <span>SEIN OFF</span>
+        </button>
+        <button class="sein-btn" id="btnSeinKanan" onclick="toggleSein('kanan')">
+            <span>▶</span>
+            <span>SEIN KANAN</span>
+        </button>
+    </div>
+    
+    <div class="controller">
+        <div></div>
+        <button class="maju" id="btnMaju" onclick="setMode('maju')">
+            <span class="icon">▲</span>
+            <span>MAJU</span>
+        </button>
+        <div></div>
+        
+        <button class="kiri" id="btnKiri">
+            <span class="icon">◀</span>
+            <span>KIRI</span>
+        </button>
+        <button class="berhenti" onclick="setMode('berhenti')">
+            <span class="icon">⏹</span>
+            <span>STOP</span>
+        </button>
+        <button class="kanan" id="btnKanan">
+            <span class="icon">▶</span>
+            <span>KANAN</span>
+        </button>
+        
+        <div></div>
+        <button class="mundur" onclick="setMode('mundur')">
+            <span class="icon">▼</span>
+            <span>MUNDUR</span>
+        </button>
+        <div></div>
+    </div>
+    
+    <div class="mode-indicator">
+        Mode: <strong id="currentMode">BERHENTI</strong>
+    </div>
+    
+    <div id="status">Status: Siap</div>
+
+    <script>
+        // ===== MQTT SETTINGS =====
+        const MQTT_BROKER = 'ws://158.140.183.210:9001';
+        const TOPIC = 'motor_robot';
+        let currentDriveMode = 'berhenti';
+        let seinKiriActive = false;
+        let seinKananActive = false;
+        
+        // ===== CONNECT TO MQTT =====
+        const client = mqtt.connect(MQTT_BROKER, {
+            clientId: 'web-controller-' + Math.random().toString(16).substr(2, 8),
+            reconnectPeriod: 1000,
+            connectTimeout: 30000
+        });
+        
+        const statusEl = document.getElementById('status');
+        const connStatusEl = document.getElementById('connectionStatus');
+        
+        client.on('connect', function () {
+            console.log('✅ Connected to MQTT Broker');
+            connStatusEl.textContent = '🟢 Connected';
+            connStatusEl.className = 'connection-status connected';
+            statusEl.textContent = '✅ MQTT Connected';
+            statusEl.style.background = 'rgba(212, 237, 218, 0.9)';
+        });
+        
+        client.on('error', function (error) {
+            console.error('❌ MQTT Error:', error);
+            connStatusEl.textContent = '🔴 Error';
+            connStatusEl.className = 'connection-status disconnected';
+            statusEl.textContent = '❌ Connection Error';
+            statusEl.style.background = 'rgba(248, 215, 218, 0.9)';
+        });
+        
+        client.on('offline', function () {
+            console.log('⚠️ MQTT Offline');
+            connStatusEl.textContent = '🟡 Reconnecting...';
+            connStatusEl.className = 'connection-status disconnected';
+        });
+        
+        // ===== FUNGSI KIRIM PERINTAH MQTT =====
+        function sendCommand(command) {
+            if (client.connected) {
+                client.publish(TOPIC, command, { qos: 0 });
+                console.log('📤 Published:', command);
+                statusEl.textContent = `✅ ${command}`;
+                statusEl.style.background = 'rgba(212, 237, 218, 0.9)';
+            } else {
+                statusEl.textContent = '❌ Not connected to MQTT';
+                statusEl.style.background = 'rgba(248, 215, 218, 0.9)';
+            }
+        }
+        
+        // ===== TOGGLE SEIN (Klik sekali nyala, klik lagi mati) =====
+        function toggleSein(direction) {
+            if (direction === 'kiri') {
+                seinKiriActive = !seinKiriActive;
+                sendCommand('sein_kiri');
+                
+                // Update tampilan button
+                const btn = document.getElementById('btnSeinKiri');
+                if (seinKiriActive) {
+                    btn.classList.add('active');
+                } else {
+                    btn.classList.remove('active');
+                }
+                
+            } else if (direction === 'kanan') {
+                seinKananActive = !seinKananActive;
+                sendCommand('sein_kanan');
+                
+                // Update tampilan button
+                const btn = document.getElementById('btnSeinKanan');
+                if (seinKananActive) {
+                    btn.classList.add('active');
+                } else {
+                    btn.classList.remove('active');
+                }
+            }
+        }
+        
+        // ===== MATIKAN SEMUA SEIN =====
+        function seinOffAll() {
+            seinKiriActive = false;
+            seinKananActive = false;
+            sendCommand('sein_off');
+            
+            document.getElementById('btnSeinKiri').classList.remove('active');
+            document.getElementById('btnSeinKanan').classList.remove('active');
+        }
+        
+        // ===== SET MODE (Maju/Mundur/Berhenti) =====
+        function setMode(mode) {
+            currentDriveMode = mode;
+            sendCommand(mode);
+            document.getElementById('currentMode').textContent = mode.toUpperCase();
+        }
+        
+        // ===== SETUP TOMBOL KIRI/KANAN (Press & Release) =====
+        function setupTurnButton(buttonId, direction) {
+            const button = document.getElementById(buttonId);
+            
+            // Mouse Events (Desktop)
+            button.addEventListener('mousedown', function(e) {
+                e.preventDefault();
+                if (currentDriveMode !== 'berhenti') {
+                    button.classList.add('pressed');
+                    sendCommand(`${direction}_press`);
+                }
+            });
+            
+            button.addEventListener('mouseup', function(e) {
+                e.preventDefault();
+                button.classList.remove('pressed');
+                sendCommand(`${direction}_release`);
+            });
+            
+            button.addEventListener('mouseleave', function(e) {
+                button.classList.remove('pressed');
+                sendCommand(`${direction}_release`);
+            });
+            
+            // Touch Events (Mobile)
+            button.addEventListener('touchstart', function(e) {
+                e.preventDefault();
+                if (currentDriveMode !== 'berhenti') {
+                    button.classList.add('pressed');
+                    sendCommand(`${direction}_press`);
+                }
+            });
+            
+            button.addEventListener('touchend', function(e) {
+                e.preventDefault();
+                button.classList.remove('pressed');
+                sendCommand(`${direction}_release`);
+            });
+            
+            button.addEventListener('touchcancel', function(e) {
+                button.classList.remove('pressed');
+                sendCommand(`${direction}_release`);
+            });
+        }
+        
+        // Setup tombol belok
+        setupTurnButton('btnKiri', 'kiri');
+        setupTurnButton('btnKanan', 'kanan');
+        
+        // ===== KEYBOARD CONTROLS =====
+        let keyPressed = {};
+        
+        document.addEventListener('keydown', function(e) {
+            if (keyPressed[e.key]) return;
+            keyPressed[e.key] = true;
+            
+            switch(e.key) {
+                case 'ArrowUp': case 'w': setMode('maju'); break;
+                case 'ArrowDown': case 's': setMode('mundur'); break;
+                case 'ArrowLeft': case 'a':
+                    if (currentDriveMode !== 'berhenti') {
+                        sendCommand('kiri_press');
+                        document.getElementById('btnKiri').classList.add('pressed');
+                    }
+                    break;
+                case 'ArrowRight': case 'd':
+                    if (currentDriveMode !== 'berhenti') {
+                        sendCommand('kanan_press');
+                        document.getElementById('btnKanan').classList.add('pressed');
+                    }
+                    break;
+                case ' ': setMode('berhenti'); break;
+                case 'q': toggleSein('kiri'); break;   // Q = Sein Kiri
+                case 'e': toggleSein('kanan'); break;  // E = Sein Kanan
+                case 'x': seinOffAll(); break;          // X = Off All
+            }
+        });
+        
+        document.addEventListener('keyup', function(e) {
+            keyPressed[e.key] = false;
+            
+            switch(e.key) {
+                case 'ArrowLeft': case 'a':
+                    sendCommand('kiri_release');
+                    document.getElementById('btnKiri').classList.remove('pressed');
+                    break;
+                case 'ArrowRight': case 'd':
+                    sendCommand('kanan_release');
+                    document.getElementById('btnKanan').classList.remove('pressed');
+                    break;
+            }
+        });
+    </script>
+</body>
+</html>
